@@ -8,9 +8,9 @@
 // TOOLS
 //////////////////////////////////////////////////////////////////////
 
-#tool "GitReleaseManager"
-#tool "GitVersion.CommandLine"
-#tool "GitLink"
+//#tool "GitReleaseManager"
+//#tool "GitVersion.CommandLine"
+//#tool "GitLink"
 
 //////////////////////////////////////////////////////////////////////
 // ARGUMENTS
@@ -36,22 +36,22 @@ var isRunningOnWindows = IsRunningOnWindows();
 
 var isRunningOnAppVeyor = AppVeyor.IsRunningOnAppVeyor;
 var isPullRequest = AppVeyor.Environment.PullRequest.IsPullRequest;
-var isRepository = StringComparer.OrdinalIgnoreCase.Equals("paulcbetts/splat", AppVeyor.Environment.Repository.Name);
+var isRepository = StringComparer.OrdinalIgnoreCase.Equals("ifit/splat", AppVeyor.Environment.Repository.Name);
 
-var isReleaseBranch = StringComparer.OrdinalIgnoreCase.Equals("master", AppVeyor.Environment.Repository.Branch);
+//var isReleaseBranch = StringComparer.OrdinalIgnoreCase.Equals("master", AppVeyor.Environment.Repository.Branch);
+var isReleaseBranch = true;
 var isTagged = AppVeyor.Environment.Repository.Tag.IsTag;
 
-var githubOwner = "paulcbetts";
+var githubOwner = "ifit";
 var githubRepository = "splat";
 var githubUrl = string.Format("https://github.com/{0}/{1}", githubOwner, githubRepository);
 
 // Version
-var gitVersion = GitVersion();
-var majorMinorPatch = gitVersion.MajorMinorPatch;
-var semVersion = gitVersion.SemVer;
-var informationalVersion = gitVersion.InformationalVersion;
-var nugetVersion = gitVersion.NuGetVersion;
-var buildVersion = gitVersion.FullBuildMetaData;
+//var gitVersion = GitVersion();
+var majorMinorPatch = "2.0.1";
+var semVersion = "2.0.1";
+var informationalVersion = "2.0.1";
+var nugetVersion = "2.0.1";
 
 // Artifacts
 var artifactDirectory = "./artifacts/";
@@ -91,14 +91,14 @@ Action<string, string> Package = (nuspec, basePath) =>
         BasePath                 = basePath,
     });};
 
-Action<string> SourceLink = (solutionFileName) =>
-{
-    GitLink("./", new GitLinkSettings() {
-        RepositoryUrl = githubUrl,
-        SolutionFileName = solutionFileName,
-        ErrorsAsWarnings = treatWarningsAsErrors, 
-    });
-};
+//Action<string> SourceLink = (solutionFileName) =>
+//{
+//    GitLink("./", new GitLinkSettings() {
+//        RepositoryUrl = githubUrl,
+//        SolutionFileName = solutionFileName,
+//        ErrorsAsWarnings = treatWarningsAsErrors, 
+//    });
+//};
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -137,7 +137,7 @@ Task("Build")
             .SetVerbosity(Verbosity.Minimal)
             .SetNodeReuse(false));
 
-        SourceLink(solution);
+        //SourceLink(solution);
     };
 
     build("./src/Splat.sln");
@@ -147,7 +147,7 @@ Task("UpdateAppVeyorBuildNumber")
     .WithCriteria(() => isRunningOnAppVeyor)
     .Does(() =>
 {
-    AppVeyor.UpdateBuildVersion(buildVersion);
+//    AppVeyor.UpdateBuildVersion(buildVersion);
 });
 
 Task("UpdateAssemblyInfo")
@@ -205,30 +205,30 @@ Task("PublishPackages")
     }
 
     // Resolve the API key.
-    var apiKey = EnvironmentVariable("NUGET_APIKEY");
-    if (string.IsNullOrEmpty(apiKey))
-    {
-        throw new Exception("The NUGET_APIKEY environment variable is not defined.");
-    }
+    //var apiKey = EnvironmentVariable("NUGET_APIKEY");
+    //if (string.IsNullOrEmpty(apiKey))
+    //{
+    //    throw new Exception("The NUGET_APIKEY environment variable is not defined.");
+    //}
 
-    var source = EnvironmentVariable("NUGET_SOURCE");
-    if (string.IsNullOrEmpty(source))
-    {
-        throw new Exception("The NUGET_SOURCE environment variable is not defined.");
-    }
+    //var source = EnvironmentVariable("NUGET_SOURCE");
+    //if (string.IsNullOrEmpty(source))
+    //{
+    //    throw new Exception("The NUGET_SOURCE environment variable is not defined.");
+    //}
 
     // only push whitelisted packages.
-    foreach(var package in packageWhitelist)
-    {
+    //foreach(var package in packageWhitelist)
+    //{
         // only push the package which was created during this build run.
-        var packagePath = artifactDirectory + File(string.Concat(package, ".", nugetVersion, ".nupkg"));
+    //    var packagePath = artifactDirectory + File(string.Concat(package, ".", nugetVersion, ".nupkg"));
 
         // Push the package.
-        NuGetPush(packagePath, new NuGetPushSettings {
-            Source = source,
-            ApiKey = apiKey
-        });
-    }
+    //    NuGetPush(packagePath, new NuGetPushSettings {
+    //        Source = source,
+    //        ApiKey = apiKey
+    //    });
+    //}
 });
 
 Task("CreateRelease")
@@ -241,24 +241,24 @@ Task("CreateRelease")
     .WithCriteria(() => !isTagged)
     .Does (() =>
 {
-    var username = EnvironmentVariable("GITHUB_USERNAME");
-    if (string.IsNullOrEmpty(username))
-    {
-        throw new Exception("The GITHUB_USERNAME environment variable is not defined.");
-    }
+    //var username = EnvironmentVariable("GITHUB_USERNAME");
+    //if (string.IsNullOrEmpty(username))
+    //{
+    //    throw new Exception("The GITHUB_USERNAME environment variable is not defined.");
+    //}
 
-    var token = EnvironmentVariable("GITHUB_TOKEN");
-    if (string.IsNullOrEmpty(token))
-    {
-        throw new Exception("The GITHUB_TOKEN environment variable is not defined.");
-    }
+    //var token = EnvironmentVariable("GITHUB_TOKEN");
+    //if (string.IsNullOrEmpty(token))
+    //{
+    //    throw new Exception("The GITHUB_TOKEN environment variable is not defined.");
+    //}
 
-    GitReleaseManagerCreate(username, token, githubOwner, githubRepository, new GitReleaseManagerCreateSettings {
-        Milestone         = majorMinorPatch,
-        Name              = majorMinorPatch,
-        Prerelease        = true,
-        TargetCommitish   = "master"
-    });
+    //GitReleaseManagerCreate(username, token, githubOwner, githubRepository, new GitReleaseManagerCreateSettings {
+    //    Milestone         = majorMinorPatch,
+    //    Name              = majorMinorPatch,
+    //    Prerelease        = true,
+    //    TargetCommitish   = "master"
+    //});
 });
 
 Task("PublishRelease")
@@ -271,28 +271,26 @@ Task("PublishRelease")
     .WithCriteria(() => isTagged)
     .Does (() =>
 {
-    var username = EnvironmentVariable("GITHUB_USERNAME");
-    if (string.IsNullOrEmpty(username))
-    {
-        throw new Exception("The GITHUB_USERNAME environment variable is not defined.");
-    }
+    //var username = EnvironmentVariable("GITHUB_USERNAME");
+    //if (string.IsNullOrEmpty(username))
+    //{
+    //    throw new Exception("The GITHUB_USERNAME environment variable is not defined.");
+    //}
 
-    var token = EnvironmentVariable("GITHUB_TOKEN");
-    if (string.IsNullOrEmpty(token))
-    {
-        throw new Exception("The GITHUB_TOKEN environment variable is not defined.");
-    }
+    //var token = EnvironmentVariable("GITHUB_TOKEN");
+    //if (string.IsNullOrEmpty(token))
+    //{
+    //    throw new Exception("The GITHUB_TOKEN environment variable is not defined.");
+    //}
 
     // only push whitelisted packages.
-    foreach(var package in packageWhitelist)
-    {
+    //foreach(var package in packageWhitelist)
+    //{
         // only push the package which was created during this build run.
-        var packagePath = artifactDirectory + File(string.Concat(package, ".", nugetVersion, ".nupkg"));
-
-        GitReleaseManagerAddAssets(username, token, githubOwner, githubRepository, majorMinorPatch, packagePath);
-    }
-
-    GitReleaseManagerClose(username, token, githubOwner, githubRepository, majorMinorPatch);
+    //    var packagePath = artifactDirectory + File(string.Concat(package, ".", nugetVersion, ".nupkg"));
+    //    GitReleaseManagerAddAssets(username, token, githubOwner, githubRepository, majorMinorPatch, packagePath);
+    //}
+    //GitReleaseManagerClose(username, token, githubOwner, githubRepository, majorMinorPatch);
 });
 
 //////////////////////////////////////////////////////////////////////

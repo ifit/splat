@@ -10,34 +10,31 @@ using System.Collections.Generic;
 using System.Linq;
 
 using Path = System.IO.Path;
+using System.Reflection;
 
 namespace Splat
 {
     public class PlatformBitmapLoader : IBitmapLoader
     {
-        static readonly Dictionary<string, int> drawableList;
+        readonly Dictionary<string, int> drawableList;
 
-        static PlatformBitmapLoader()
+        public PlatformBitmapLoader()
         {
-            // NB: This is some hacky shit, but on MonoAndroid at the moment, 
-            // this is always the entry assembly.
-            var assm = AppDomain.CurrentDomain.GetAssemblies()[1];
-
-            var resources = assm.GetModules().SelectMany(x => x.GetTypes()).First(x => x.Name == "Resource");
-
-            drawableList = resources.GetNestedType("Drawable").GetFields()
-                .Where(x => x.FieldType == typeof(int))
-                .ToDictionary(k => k.Name, v => (int)v.GetRawConstantValue());
+            drawableList = GetDrawableList();
         }
 
         public async Task<IBitmap> Load(Stream sourceStream, float? desiredWidth, float? desiredHeight)
         {
             Bitmap bitmap = null;
-            
-            if (desiredWidth == null) {
+
+            if (desiredWidth == null)
+            {
                 bitmap = await Task.Run(() => BitmapFactory.DecodeStream(sourceStream));
-            } else {
-                var opts = new BitmapFactory.Options() {
+            }
+            else
+            {
+                var opts = new BitmapFactory.Options()
+                {
                     OutWidth = (int)desiredWidth.Value,
                     OutHeight = (int)desiredHeight.Value,
                 };
@@ -46,7 +43,8 @@ namespace Splat
                 bitmap = await Task.Run(() => BitmapFactory.DecodeStream(sourceStream, noPadding, opts));
             }
 
-            if (bitmap == null) {
+            if (bitmap == null)
+            {
                 throw new IOException("Failed to load bitmap from source stream");
             }
 
@@ -58,18 +56,21 @@ namespace Splat
             var res = Application.Context.Resources;
 
             var id = default(int);
-            if (Int32.TryParse(source, out id)) {
+            if (Int32.TryParse(source, out id))
+            {
                 return Task.Run(() => (IBitmap)new DrawableBitmap(res.GetDrawable(id)));
             }
 
-            if (drawableList.ContainsKey(source)) {
+            if (drawableList.ContainsKey(source))
+            {
                 return Task.Run(() => (IBitmap)new DrawableBitmap(res.GetDrawable(drawableList[source])));
             }
 
             // NB: On iOS, you have to pass the extension, but on Android it's 
             // stripped - try stripping the extension to see if there's a Drawable.
             var key = Path.GetFileNameWithoutExtension(source);
-            if (drawableList.ContainsKey(key)) {
+            if (drawableList.ContainsKey(key))
+            {
                 return Task.Run(() => (IBitmap)new DrawableBitmap(res.GetDrawable(drawableList[key])));
             }
 
@@ -79,6 +80,87 @@ namespace Splat
         public IBitmap Create(float width, float height)
         {
             return Bitmap.CreateBitmap((int)width, (int)height, Bitmap.Config.Argb8888).FromNative();
+        }
+
+        internal static Dictionary<string, int> GetDrawableList(IFullLogger log)
+        {
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+
+            return GetDrawableList(log, assemblies);
+        }
+
+        internal static Dictionary<string, int> GetDrawableList(
+            IFullLogger log,
+            Assembly[] assemblies)
+        {
+            // VS2019 onward
+            var drawableTypes = assemblies
+                .SelectMany(a => GetTypesFromAssembly(a, log))
+                .Where(x => x.Name == "Resource" && x.GetNestedType("Drawable") != null)
+                .Select(x => x.GetNestedType("Drawable"))
+                .ToArray();
+
+            if (log != null)
+            {
+                log.Debug("DrawableList. Got " + drawableTypes.Length + " types.");
+                foreach (var drawableType in drawableTypes)
+                {
+                    log.Debug("DrawableList Type: " + drawableType.Name);
+                }
+            }
+
+            var result = drawableTypes
+                .SelectMany(x => x.GetFields())
+                .Where(x => x.FieldType == typeof(int) && x.IsLiteral)
+                .ToDictionary(k => k.Name, v => (int)v.GetRawConstantValue());
+
+            if (log != null)
+            {
+                log.Debug("DrawableList. Got " + result.Count + " items.");
+                foreach (var keyValuePair in result)
+                {
+                    log.Debug("DrawableList Item: " + keyValuePair.Key);
+                }
+            }
+
+            return result;
+        }
+
+        internal static Type[] GetTypesFromAssembly(
+            Assembly assembly,
+            IFullLogger log)
+        {
+            try
+            {
+                return assembly.GetTypes();
+            }
+            catch (ReflectionTypeLoadException e)
+            {
+                // The array returned by the Types property of this exception contains a Type
+                // object for each type that was loaded and null for each type that could not
+                // be loaded, while the LoaderExceptions property contains an exception for
+                // each type that could not be loaded.
+                if (log != null)
+                {
+                    log.Warn("Exception while detecting drawing types.", e);
+
+                    foreach (var loaderException in e.LoaderExceptions)
+                    {
+                        log.Warn("Inner Exception for detecting drawing types.", loaderException);
+                    }
+                }
+
+                // null check here because mono doesn't appear to follow the MSDN documentation
+                // as of July 2019.
+                return e.Types != null
+                    ? e.Types.Where(x => x != null).ToArray()
+                    : Array.Empty<Type>();
+            }
+        }
+
+        private Dictionary<string, int> GetDrawableList()
+        {
+            return GetDrawableList(Locator.Current.GetService<ILogManager>().GetLogger(typeof(PlatformBitmapLoader)));
         }
     }
 
@@ -91,11 +173,13 @@ namespace Splat
             this.inner = inner;
         }
 
-        public float Width {
+        public float Width
+        {
             get { return (float)inner.IntrinsicWidth; }
         }
 
-        public float Height {
+        public float Height
+        {
             get { return (float)inner.IntrinsicHeight; }
         }
 
@@ -119,11 +203,13 @@ namespace Splat
             this.inner = inner;
         }
 
-        public float Width {
+        public float Width
+        {
             get { return inner.Width; }
         }
 
-        public float Height {
+        public float Height
+        {
             get { return inner.Height; }
         }
 
@@ -145,9 +231,12 @@ namespace Splat
         public static Drawable ToNative(this IBitmap This)
         {
             var androidBitmap = This as AndroidBitmap;
-            if (androidBitmap != null) {
+            if (androidBitmap != null)
+            {
                 return new BitmapDrawable(((AndroidBitmap)This).inner);
-            } else {
+            }
+            else
+            {
                 return ((DrawableBitmap)This).inner;
             }
         }
